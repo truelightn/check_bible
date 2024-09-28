@@ -108,7 +108,7 @@ class _CompareProgressScreenState extends State<CompareProgressScreen> {
                     const Padding(
                       padding: EdgeInsets.all(16.0),
                       child: Text(
-                        '전체 사용자 진행 상황',
+                        '전체 사용자 읽기 현황',
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -177,7 +177,7 @@ class _CompareProgressScreenState extends State<CompareProgressScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '상위 3명의 사용자',
+            '상위 3인',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16.0),
