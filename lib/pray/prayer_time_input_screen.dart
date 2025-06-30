@@ -31,34 +31,25 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
     compareController.fetchPrayerTimes(); // 학년별 기도시간 데이터 가져오기
   }
 
-  // 학년별 평균 기도시간을 계산하는 함수
-  Map<String, double> calculateAverageByGrade() {
-    Map<String, List<double>> gradeMinutes = {
-      '1학년': [],
-      '2학년': [],
-      '3학년': [],
+  // 학년별 누적 기도시간을 계산하는 함수
+  Map<String, double> calculateTotalByGrade() {
+    Map<String, double> gradeTotals = {
+      '1학년': 0,
+      '2학년': 0,
+      '3학년': 0,
     };
 
     for (var user in compareController.prayerRankingList) {
       if (user['gradeClass'].toString().startsWith('1')) {
-        gradeMinutes['1학년']!.add(user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
+        gradeTotals['1학년'] = gradeTotals['1학년']! + (user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
       } else if (user['gradeClass'].toString().startsWith('2')) {
-        gradeMinutes['2학년']!.add(user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
+        gradeTotals['2학년'] = gradeTotals['2학년']! + (user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
       } else if (user['gradeClass'].toString().startsWith('3')) {
-        gradeMinutes['3학년']!.add(user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
+        gradeTotals['3학년'] = gradeTotals['3학년']! + (user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
       }
     }
 
-    Map<String, double> averages = {};
-    gradeMinutes.forEach((grade, minutes) {
-      if (minutes.isNotEmpty) {
-        averages[grade] = minutes.reduce((a, b) => a + b) / minutes.length;
-      } else {
-        averages[grade] = 0;
-      }
-    });
-
-    return averages;
+    return gradeTotals;
   }
 
   Widget _buildGradeChart() {
@@ -67,8 +58,25 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
         return const Center(child: CircularProgressIndicator());
       }
 
-      Map<String, double> averages = calculateAverageByGrade();
-      maxY = averages.values.reduce((curr, next) => curr > next ? curr : next);
+      Map<String, double> totals = calculateTotalByGrade();
+      maxY = totals.values.reduce((curr, next) => curr > next ? curr : next);
+
+      // Y축 간격 및 단위 계산
+      double interval;
+      String Function(double) formatTime;
+
+      if (maxY > 1000 * 60) {
+        // 1000시간 초과
+        interval = 100 * 60; // 100시간 간격
+        formatTime = (value) => '${(value / 60).floor()}시간';
+      } else if (maxY > 100 * 60) {
+        // 100시간 초과
+        interval = 10 * 60; // 10시간 간격
+        formatTime = (value) => '${(value / 60).floor()}시간';
+      } else {
+        interval = 60; // 1시간 간격
+        formatTime = (value) => '${(value / 60).floor()}시간';
+      }
 
       return Container(
         height: 250,
@@ -76,17 +84,17 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
         child: BarChart(
           BarChartData(
             alignment: BarChartAlignment.spaceAround,
-            maxY: maxY + 30,
+            maxY: maxY + interval,
             minY: 0,
             barGroups: [
-              _createBarGroup(0, averages['1학년']!, [Color(0xFF2196F3), Color(0xFF64B5F6)]),
-              _createBarGroup(1, averages['2학년']!, [Color(0xFF4CAF50), Color(0xFF81C784)]),
-              _createBarGroup(2, averages['3학년']!, [Color(0xFFF44336), Color(0xFFE57373)]),
+              _createBarGroup(0, totals['1학년']!, [Color(0xFF2196F3), Color(0xFF64B5F6)]),
+              _createBarGroup(1, totals['2학년']!, [Color(0xFF4CAF50), Color(0xFF81C784)]),
+              _createBarGroup(2, totals['3학년']!, [Color(0xFFF44336), Color(0xFFE57373)]),
             ],
             gridData: FlGridData(
               show: true,
               drawVerticalLine: false,
-              horizontalInterval: 60,
+              horizontalInterval: interval,
               getDrawingHorizontalLine: (value) {
                 return FlLine(
                   color: Colors.grey[300],
@@ -100,7 +108,7 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  reservedSize: 32, // 하단 여백 증가
+                  reservedSize: 32,
                   getTitlesWidget: (value, meta) {
                     String text = ['1학년', '2학년', '3학년'][value.toInt()];
                     return SideTitleWidget(
@@ -120,16 +128,18 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  reservedSize: 40,
-                  interval: 60,
+                  reservedSize: 50,
+                  interval: interval,
                   getTitlesWidget: (value, meta) {
-                    return Text(
-                      '${(value / 60).floor()}시간',
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 11,
-                      ),
-                    );
+                    return value == 0
+                        ? const Text('0')
+                        : Text(
+                            formatTime(value),
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 11,
+                            ),
+                          );
                   },
                 ),
               ),
@@ -400,7 +410,7 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
                           ),
                           const SizedBox(width: 8),
                           const Text(
-                            '학년별 평균 기도시간',
+                            '학년별 누적 기도시간',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -551,3 +561,4 @@ class PrayerTimeListWidget extends StatelessWidget {
     );
   }
 }
+
