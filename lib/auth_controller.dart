@@ -11,23 +11,30 @@ class AuthController extends GetxController {
   var isLoggedIn = false.obs;
   var username = ''.obs;
   var password = ''.obs;
+  var userGradeClass = ''.obs;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GetStorage storage = GetStorage(); // GetStorage 인스턴스
 
-void login(String inputUsername, String inputPassword, String gradeClass) async {
-    var result = await _firestore.collection('teachers').doc(inputUsername).get();
+  // 로그인 처리
+  Future<bool> login(String name, String gradeClass) async {
+    try {
+      // 사용자 정보를 Firestore에 저장
+      await _firestore.collection('teachers').doc(name).set({
+        'name': name,
+        'gradeClass': gradeClass,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    if (result.exists) {
-      var data = result.data()!;
-      if (data['password'] == inputPassword) {
-        _handleLoginSuccess(inputUsername, inputPassword, gradeClass);
-      } else {
-        Get.snackbar('Error', 'Invalid password');
-      }
-    } else {
-      await _createNewAccount(inputUsername, inputPassword, gradeClass);
-      _handleLoginSuccess(inputUsername, inputPassword, gradeClass);
+      // 로그인 상태 업데이트
+      username.value = name;
+      userGradeClass.value = gradeClass;
+      isLoggedIn.value = true;
+
+      return true;
+    } catch (e) {
+      print('Login error: $e');
+      return false;
     }
   }
 
@@ -48,7 +55,7 @@ void login(String inputUsername, String inputPassword, String gradeClass) async 
 
 Future<void> _createNewAccount(String inputUsername, String inputPassword, String gradeClass) async {
     // 새 계정 생성
-    await _firestore.collection('users').doc(inputUsername).set({
+    await _firestore.collection('teachers').doc(inputUsername).set({
       'username': inputUsername,
       'password': inputPassword,
       'gradeClass': gradeClass, // 학년+반 정보 저장
@@ -64,19 +71,15 @@ void autoLogin() {
     String? storedGradeClass = storage.read('gradeClass'); // 저장된 학년+반 정보 불러오기
 
     if (storedUsername != null && storedPassword != null && storedGradeClass != null) {
-      login(storedUsername, storedPassword, storedGradeClass);
+      login(storedUsername, storedGradeClass);
     }
   }
 
   // 로그아웃
-void logout() {
+  void logout() {
     username.value = '';
-    password.value = '';
+    userGradeClass.value = '';
     isLoggedIn.value = false;
-    storage.remove('username');
-    storage.remove('password');
-    storage.remove('gradeClass'); // 저장된 학년+반 정보 삭제
-    Get.offAll(() => LoginScreen()); // 로그아웃 후 로그인 화면으로 이동
   }
 
 }

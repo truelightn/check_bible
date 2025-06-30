@@ -45,12 +45,18 @@ class LoginScreen extends StatelessWidget {
                 )),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () {
-                authController.login(
-                  usernameController.text,
-                  passwordController.text,
-                  selectedGradeClass.value, // 학년+반 정보 전달
-                );
+              onPressed: () async {
+                if (await authController.login(usernameController.text, selectedGradeClass.value)) {
+                  // 로그인 성공
+                  Get.offNamed('/prayer_time_input');
+                } else {
+                  // 로그인 실패
+                  Get.snackbar(
+                    '오류',
+                    '로그인에 실패했습니다.',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                }
               },
               child: const Text('등록하기'),
             ),

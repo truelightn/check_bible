@@ -29,14 +29,16 @@ class MyApp extends StatelessWidget {
     authController.autoLogin();
 
     return GetMaterialApp(
-      title: '25년 고등부 여름 수련회 다니엘 기도회!',
+      title: '기도시간 체크',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        fontFamily: 'NotoSansKR',
       ),
-      home: Obx(() {
-        // 로그인 상태에 따라 다른 화면을 보여줌
-        return authController.isLoggedIn.value ? PrayerTimeInputScreen() : LoginScreen();
-      }),
+      initialRoute: '/',
+      getPages: [
+        GetPage(name: '/', page: () => LoginScreen()),
+        GetPage(name: '/prayer_time_input', page: () => PrayerTimeInputScreen()),
+      ],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

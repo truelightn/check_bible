@@ -23,7 +23,7 @@ class BibleController extends GetxController {
 
     try {
       // Firestore에서 해당 사용자의 데이터를 불러옵니다.
-      var userDoc = await _firestore.collection('users').doc(username).get();
+      var userDoc = await _firestore.collection('teachers').doc(username).get();
       if (userDoc.exists && userDoc.data() != null) {
         var data = userDoc.data()!;
 

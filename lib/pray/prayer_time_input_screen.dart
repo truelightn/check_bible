@@ -1,13 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:get/get.dart';
 import 'package:check_bible/auth_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'prayer_time_controller.dart';
-import 'package:intl/intl.dart'; // 날짜 포맷을 위해 사용
-import 'package:check_bible/compare/compare_progress_screen.dart'; // 새로운 import 추가
 import 'package:fl_chart/fl_chart.dart';
-import 'package:check_bible/compare/compare_controller.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart'; // 날짜 포맷을 위해 사용
+
+import 'grade_prayer_detail_screen.dart';
+import 'prayer_time_controller.dart';
 
 class PrayerTimeInputScreen extends StatefulWidget {
   @override
@@ -17,7 +16,6 @@ class PrayerTimeInputScreen extends StatefulWidget {
 class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
   final PrayerTimeController prayerTimeController = Get.put(PrayerTimeController());
   final AuthController authController = Get.find(); // 사용자 정보 접근
-  final CompareController compareController = Get.put(CompareController());
 
   Duration selectedDuration = Duration(hours: 0, minutes: 0);
   DateTime selectedDate = DateTime.now(); // 선택된 날짜 추가
@@ -28,176 +26,160 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
     super.initState();
     // Firestore에서 누적 기도 시간을 계산하고 초기화
     prayerTimeController.calculateTotalPrayerTimes(authController.username.value);
-    compareController.fetchPrayerTimes(); // 학년별 기도시간 데이터 가져오기
+    prayerTimeController.calculateGradeAccumulatedTimes(); // 학년별 누적시간 계산 추가
   }
 
   // 학년별 누적 기도시간을 계산하는 함수
   Map<String, double> calculateTotalByGrade() {
-    Map<String, double> gradeTotals = {
-      '1학년': 0,
-      '2학년': 0,
-      '3학년': 0,
-    };
-
-    for (var user in compareController.prayerRankingList) {
-      if (user['gradeClass'].toString().startsWith('1')) {
-        gradeTotals['1학년'] = gradeTotals['1학년']! + (user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
-      } else if (user['gradeClass'].toString().startsWith('2')) {
-        gradeTotals['2학년'] = gradeTotals['2학년']! + (user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
-      } else if (user['gradeClass'].toString().startsWith('3')) {
-        gradeTotals['3학년'] = gradeTotals['3학년']! + (user['totalPrayerHours'] * 60 + user['totalPrayerMinutes']);
-      }
-    }
-
-    return gradeTotals;
+    return prayerTimeController.gradeAccumulatedMinutes;
   }
 
   Widget _buildGradeChart() {
     return Obx(() {
-      if (compareController.prayerRankingList.isEmpty) {
+      if (prayerTimeController.gradeAccumulatedMinutes.isEmpty) {
         return const Center(child: CircularProgressIndicator());
       }
 
       Map<String, double> totals = calculateTotalByGrade();
-      maxY = totals.values.reduce((curr, next) => curr > next ? curr : next);
+      
+      return FutureBuilder<Map<String, double>>(
+        future: Future.wait([
+          prayerTimeController.calculateGradeTargetMinutes('1학년'),
+          prayerTimeController.calculateGradeTargetMinutes('2학년'),
+          prayerTimeController.calculateGradeTargetMinutes('3학년'),
+          prayerTimeController.calculateGradeTargetMinutes('새친구'),
+          prayerTimeController.calculateGradeTargetMinutes('임원'),
+        ]).then((values) => {
+              '1학년': values[0],
+              '2학년': values[1],
+              '3학년': values[2],
+              '새친구': values[3],
+              '임원': values[4],
+            }),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      // Y축 간격 및 단위 계산
-      double interval;
-      String Function(double) formatTime;
+          Map<String, double> targets = snapshot.data!;
+          maxY = [...totals.values, ...targets.values].reduce((curr, next) => curr > next ? curr : next);
 
-      if (maxY > 1000 * 60) {
-        // 1000시간 초과
-        interval = 100 * 60; // 100시간 간격
-        formatTime = (value) => '${(value / 60).floor()}시간';
-      } else if (maxY > 100 * 60) {
-        // 100시간 초과
-        interval = 10 * 60; // 10시간 간격
-        formatTime = (value) => '${(value / 60).floor()}시간';
-      } else {
-        interval = 60; // 1시간 간격
-        formatTime = (value) => '${(value / 60).floor()}시간';
-      }
+          // Y축 간격 계산 (최대값을 10개의 구간으로 나눔)
+          double interval = (maxY / 10).roundToDouble();
+          // 간격을 60분 단위로 올림
+          if (interval % 60 != 0) {
+            interval = ((interval / 60).ceil() * 60).toDouble();
+          }
+          maxY = interval * 10; // maxY를 간격의 10배로 조정
 
-      return Container(
-        height: 250,
-        padding: const EdgeInsets.all(16),
-        child: BarChart(
-          BarChartData(
-            alignment: BarChartAlignment.spaceAround,
-            maxY: maxY + interval,
-            minY: 0,
-            barGroups: [
-              _createBarGroup(0, totals['1학년']!, [Color(0xFF2196F3), Color(0xFF64B5F6)]),
-              _createBarGroup(1, totals['2학년']!, [Color(0xFF4CAF50), Color(0xFF81C784)]),
-              _createBarGroup(2, totals['3학년']!, [Color(0xFFF44336), Color(0xFFE57373)]),
-            ],
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              horizontalInterval: interval,
-              getDrawingHorizontalLine: (value) {
-                return FlLine(
-                  color: Colors.grey[300],
-                  strokeWidth: 1,
-                  dashArray: [5, 5],
-                );
-              },
-            ),
-            titlesData: FlTitlesData(
-              show: true,
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 32,
-                  getTitlesWidget: (value, meta) {
-                    String text = ['1학년', '2학년', '3학년'][value.toInt()];
-                    return SideTitleWidget(
-                      axisSide: meta.axisSide,
-                      child: Text(
-                        text,
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
+          return Container(
+            height: 250,
+            padding: const EdgeInsets.all(16),
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxY + interval,
+                minY: 0,
+                barGroups: [
+                  _createBarGroupWithTarget(0, totals['1학년']!, targets['1학년']!, [Color(0xFF2196F3), Color(0xFF64B5F6)]),
+                  _createBarGroupWithTarget(1, totals['2학년']!, targets['2학년']!, [Color(0xFF4CAF50), Color(0xFF81C784)]),
+                  _createBarGroupWithTarget(2, totals['3학년']!, targets['3학년']!, [Color(0xFFF44336), Color(0xFFE57373)]),
+                  _createBarGroupWithTarget(3, totals['새친구']!, targets['새친구']!, [Color(0xFF9C27B0), Color(0xFFBA68C8)]),
+                  _createBarGroupWithTarget(4, totals['임원']!, targets['임원']!, [Color(0xFFFF9800), Color(0xFFFFB74D)]),
+                ],
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: interval,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey[300],
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
                     );
                   },
                 ),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 50,
-                  interval: interval,
-                  getTitlesWidget: (value, meta) {
-                    return value == 0
-                        ? const Text('0')
-                        : Text(
-                            formatTime(value),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 32,
+                      getTitlesWidget: (value, meta) {
+                        String text = ['1학년', '2학년', '3학년', '새친구', '임원'][value.toInt()];
+                        return SideTitleWidget(
+                          axisSide: meta.axisSide,
+                          child: Text(
+                            text,
                             style: const TextStyle(
-                              color: Colors.black54,
-                              fontSize: 11,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
-                          );
-                  },
-                ),
-              ),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            borderData: FlBorderData(
-              show: true,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-                left: BorderSide(color: Colors.grey[300]!, width: 1),
-              ),
-            ),
-            barTouchData: BarTouchData(
-              enabled: true,
-              touchTooltipData: BarTouchTooltipData(
-                tooltipBgColor: Colors.blueGrey.withOpacity(0.9),
-                tooltipRoundedRadius: 8,
-                tooltipPadding: const EdgeInsets.all(12),
-                getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                  String grade = ['1학년', '2학년', '3학년'][groupIndex];
-                  int hours = (rod.toY / 60).floor();
-                  int minutes = (rod.toY % 60).round();
-                  return BarTooltipItem(
-                    '$grade\n$hours시간 $minutes분',
-                    const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 50,
+                      interval: interval,
+                      getTitlesWidget: (value, meta) {
+                        return value == 0
+                            ? const Text('0')
+                            : Text(
+                                '${(value / 60).floor()}시간',
+                                style: const TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 11,
+                                ),
+                              );
+                      },
+                    ),
+                  ),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    tooltipBgColor: Colors.blueGrey.withOpacity(0.9),
+                    tooltipRoundedRadius: 8,
+                    tooltipPadding: const EdgeInsets.all(12),
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      String grade = ['1학년', '2학년', '3학년', '새친구', '임원'][groupIndex];
+                      String label = rodIndex == 0 ? '누적' : '목표';
+                      int hours = (rod.toY / 60).floor();
+                      int minutes = (rod.toY % 60).round();
+                      return BarTooltipItem(
+                        '$grade $label\n$hours시간 $minutes분',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
-            groupsSpace: 32, // 막대 사이 간격 조정
-            baselineY: 0,
-            extraLinesData: ExtraLinesData(
-              horizontalLines: [
-                HorizontalLine(
-                  y: 0,
-                  color: Colors.grey[300],
-                  strokeWidth: 1,
-                ),
-              ],
-            ),
-          ),
-        ),
+          );
+        },
       );
     });
   }
 
-  BarChartGroupData _createBarGroup(int x, double value, List<Color> colors) {
+  BarChartGroupData _createBarGroupWithTarget(int x, double value, double target, List<Color> colors) {
     return BarChartGroupData(
       x: x,
+      groupVertically: false,
       barRods: [
         BarChartRodData(
           toY: value,
-          width: 20, // 막대 너비 약간 감소
+          width: 16,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(6),
             topRight: Radius.circular(6),
@@ -207,13 +189,22 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
           ),
-          backDrawRodData: BackgroundBarChartRodData(
-            show: true,
-            toY: maxY + 30,
-            color: Colors.grey[200],
+        ),
+        BarChartRodData(
+          toY: target,
+          width: 16,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(6),
+            topRight: Radius.circular(6),
+          ),
+          gradient: LinearGradient(
+            colors: [Colors.grey[400]!, Colors.grey[300]!],
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
           ),
         ),
       ],
+      barsSpace: 4,
     );
   }
 
@@ -244,7 +235,8 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
     await prayerTimeController.savePrayerTime(authController.username.value);
 
     // Firestore에서 누적 시간을 다시 계산하여 업데이트
-    prayerTimeController.calculateTotalPrayerTimes(authController.username.value);
+    await prayerTimeController.calculateTotalPrayerTimes(authController.username.value);
+    await prayerTimeController.calculateGradeAccumulatedTimes(); // 학년별 누적시간 다시 계산
 
     Get.back();
   }
@@ -289,56 +281,203 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  width: 4,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Obx(() => Text(
+                          '${authController.username.value}님의 기도시간',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                const Text(
-                  '나의 기도시간',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                // IconButton(
+                //   onPressed: _showTargetSettingDialog,
+                //   icon: const Icon(Icons.settings),
+                //   tooltip: '목표 설정',
+                // ),
               ],
             ),
             const SizedBox(height: 16),
-            Obx(() => Row(
-                  children: [
-                    Expanded(
-                      child: _buildTimeInfoBox(
-                        '누적 기도시간',
-                        '${prayerTimeController.totalPrayerHour.value}시간 '
-                            '${prayerTimeController.totalPrayerMinute.value}분',
-                        Colors.blue,
-                        Icons.access_time,
+            Obx(() {
+              final targetMinutes = prayerTimeController.calculateTargetMinutes();
+              final targetHours = (targetMinutes / 60).floor();
+              final targetMins = (targetMinutes % 60).round();
+              final progressPercentage = prayerTimeController.calculateProgressPercentage();
+
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTimeInfoBox(
+                          '목표 기도시간',
+                          '$targetHours시간 $targetMins분',
+                          Colors.orange,
+                          Icons.flag,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildTimeInfoBox(
-                        '오늘의 기도시간',
-                        '${prayerTimeController.todayPrayerHour.value}시간 '
-                            '${prayerTimeController.todayPrayerMinute.value}분',
-                        Colors.green,
-                        Icons.today,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildTimeInfoBox(
+                          '누적 기도시간',
+                          '${prayerTimeController.totalPrayerHour.value}시간 '
+                              '${prayerTimeController.totalPrayerMinute.value}분',
+                          Colors.blue,
+                          Icons.access_time,
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTimeInfoBox(
+                          '오늘의 기도시간',
+                          '${prayerTimeController.todayPrayerHour.value}시간 '
+                              '${prayerTimeController.todayPrayerMinute.value}분',
+                          Colors.green,
+                          Icons.today,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildTimeInfoBox(
+                          '달성률',
+                          '${progressPercentage.toStringAsFixed(1)}%',
+                          progressPercentage >= 100
+                              ? Colors.green
+                              : progressPercentage < 30
+                                  ? Colors.red
+                                  : Colors.blue,
+                          Icons.pie_chart,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    value: progressPercentage / 100,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      progressPercentage >= 100
+                          ? Colors.green
+                          : progressPercentage < 30
+                              ? Colors.red
+                              : Colors.blue,
                     ),
-                  ],
-                )),
+                    minHeight: 10,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ],
+              );
+            }),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTimeInfoBox(String title, String time, Color color, IconData icon) {
+  void _showTargetSettingDialog() {
+    final startDate = prayerTimeController.startDate.value;
+    final dailyTarget = prayerTimeController.dailyTargetMinutes.value;
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('목표 설정'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('시작 날짜'),
+              subtitle: Text(DateFormat('yyyy년 MM월 dd일').format(startDate)),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: Get.context!,
+                  initialDate: startDate,
+                  firstDate: DateTime(2024),
+                  lastDate: DateTime(2026),
+                );
+                if (picked != null) {
+                  prayerTimeController.updateStartDate(picked);
+                  Get.back();
+                  _showTargetSettingDialog(); // 다이얼로그 새로고침
+                }
+              },
+            ),
+            ListTile(
+              title: const Text('하루 목표'),
+              subtitle: Text('$dailyTarget분'),
+              trailing: const Icon(Icons.timer),
+              onTap: () {
+                Get.back();
+                _showDailyTargetDialog();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDailyTargetDialog() {
+    final controller = TextEditingController(
+      text: prayerTimeController.dailyTargetMinutes.value.toString(),
+    );
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('하루 목표 시간 설정'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: '분 단위로 입력',
+            hintText: '예: 30',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              final minutes = int.tryParse(controller.text);
+              if (minutes != null && minutes > 0) {
+                prayerTimeController.updateDailyTarget(minutes);
+                Get.back();
+                _showTargetSettingDialog(); // 다이얼로그 새로고침
+              }
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeInfoBox(String title, String value, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -365,7 +504,7 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            time,
+            value,
             style: TextStyle(
               color: color,
               fontSize: 18,
@@ -382,6 +521,33 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('기도시간 입력'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: '로그아웃',
+            onPressed: () {
+              Get.dialog(
+                AlertDialog(
+                  title: const Text('로그아웃'),
+                  content: const Text('정말 로그아웃 하시겠습니까?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Get.back(),
+                      child: const Text('취소'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        authController.logout();
+                        Get.offAllNamed('/');
+                      },
+                      child: const Text('로그아웃'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -399,21 +565,36 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            width: 4,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 4,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                '학년별 누적 기도시간',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '학년별 누적 기도시간',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                          TextButton.icon(
+                            onPressed: () {
+                              Get.to(() => GradePrayerDetailScreen());
+                            },
+                            icon: const Icon(Icons.arrow_forward),
+                            label: const Text('자세히 보기'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.blue,
                             ),
                           ),
                         ],
@@ -522,43 +703,53 @@ class PrayerTimeListWidget extends StatelessWidget {
     final AuthController authController = Get.find();
     final PrayerTimeController prayerTimeController = Get.find();
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: prayerTimeController.getPrayerTimes(authController.username.value), // 기도 시간 데이터를 가져오는 스트림
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator()); // 로딩 중 표시
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Text('저장된 기도 시간이 없습니다.'); // 데이터가 없을 때
-        }
-
-        // Firestore에서 가져온 기도 시간 데이터를 리스트로 표시
-        return ListView.builder(
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            var doc = snapshot.data!.docs[index];
-            var data = doc.data() as Map<String, dynamic>;
-            var date = (data['date'] as Timestamp).toDate();
-            var hour = data['hour'];
-            var minute = data['minute'];
-
-            return ListTile(
-              title: Text(
-                '${DateFormat('yyyy-MM-dd').format(date)}: $hour시간 $minute분',
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () {
-                  // 기도 시간 삭제
-                  prayerTimeController.deletePrayerTime(authController.username.value, doc.id);
-                },
-              ),
-            );
-          },
+    return Obx(() {
+      final username = authController.username.value;
+      if (username.isEmpty) {
+        return const Center(
+          child: Text('로그인이 필요합니다.'),
         );
-      },
-    );
+      }
+
+      return StreamBuilder<QuerySnapshot>(
+        stream: prayerTimeController.getPrayerTimes(username),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('저장된 기도 시간이 없습니다.'));
+          }
+
+          return ListView.builder(
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              var doc = snapshot.data!.docs[index];
+              var data = doc.data() as Map<String, dynamic>;
+              var date = (data['date'] as Timestamp).toDate();
+              var hour = data['hour'];
+              var minute = data['minute'];
+
+              return ListTile(
+                title: Text(
+                  '${DateFormat('yyyy-MM-dd').format(date)}: $hour시간 $minute분',
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: () async {
+                    await prayerTimeController.deletePrayerTime(username, doc.id);
+                    // 삭제 후 누적 시간 다시 계산
+                    await prayerTimeController.calculateTotalPrayerTimes(username);
+                    await prayerTimeController.calculateGradeAccumulatedTimes();
+                  },
+                ),
+              );
+            },
+          );
+        },
+      );
+    });
   }
 }
 

@@ -18,20 +18,72 @@ class PrayerTimeController extends GetxController {
     '1학년': 0.0,
     '2학년': 0.0,
     '3학년': 0.0,
+    '새친구': 0.0,
+    '임원': 0.0,
   }.obs;
 
-  // 학년별 인원 수 (Firestore에서 가져올 수 있도록 나중에 수정 필요)
+  // 학년별 학생 수 (임시 데이터)
   final Map<String, int> gradeStudentCount = {
     '1학년': 10,
-    '2학년': 12,
-    '3학년': 15,
+    '2학년': 10,
+    '3학년': 10,
+    '새친구': 5,
+    '임원': 5,
   };
 
-  // 목표 시간 계산 (분 단위)
-  double calculateTargetMinutes(String grade) {
-    final DateTime startDate = DateTime(2024, 3, 1); // 시작 날짜
-    final int daysPassed = DateTime.now().difference(startDate).inDays;
-    return gradeStudentCount[grade]! * 30.0 * (daysPassed + 1); // 하루 30분 * 인원수 * 경과일수
+  // 목표 기도시간 설정
+  final Rx<DateTime> startDate = DateTime(2025, 6, 28).obs;
+  final RxInt dailyTargetMinutes = 30.obs; // 하루 목표 기도시간 (분)
+
+  // 목표 기도시간 계산
+  double calculateTargetMinutes() {
+    final now = DateTime.now();
+    final difference = now.difference(startDate.value).inDays;
+    return difference * dailyTargetMinutes.value.toDouble();
+  }
+
+  // 목표 달성률 계산
+  double calculateProgressPercentage() {
+    final targetMinutes = calculateTargetMinutes();
+    if (targetMinutes <= 0) return 0;
+    return ((totalPrayerHour.value * 60 + totalPrayerMinute.value) / targetMinutes * 100).clamp(0, 100);
+  }
+
+  // 시작 날짜 변경
+  void updateStartDate(DateTime newDate) {
+    startDate.value = newDate;
+  }
+
+  // 하루 목표 시간 변경
+  void updateDailyTarget(int minutes) {
+    dailyTargetMinutes.value = minutes;
+  }
+
+  // 학년별 목표시간 계산 (분 단위)
+  Future<double> calculateGradeTargetMinutes(String grade) async {
+    final int daysPassed = DateTime.now().difference(startDate.value).inDays;
+
+    // 해당 학년의 학생 수 계산
+    QuerySnapshot usersSnapshot = await _firestore.collection('teachers').get();
+    int studentCount = 0;
+
+    for (var userDoc in usersSnapshot.docs) {
+      String gradeClass = (userDoc.data() as Map<String, dynamic>)['gradeClass'] ?? '';
+
+      if (grade == '1학년' && gradeClass.startsWith('1')) {
+        studentCount++;
+      } else if (grade == '2학년' && gradeClass.startsWith('2')) {
+        studentCount++;
+      } else if (grade == '3학년' && gradeClass.startsWith('3')) {
+        studentCount++;
+      } else if (grade == '새친구' && gradeClass == '새친구') {
+        studentCount++;
+      } else if (grade == '임원' && gradeClass == '임원') {
+        studentCount++;
+      }
+    }
+
+    return studentCount * 30.0 * (daysPassed + 1); // 하루 30분 * 실제 인원수 * 경과일수
   }
 
   // 학년별 누적 시간 계산
@@ -40,26 +92,33 @@ class PrayerTimeController extends GetxController {
       '1학년': 0.0,
       '2학년': 0.0,
       '3학년': 0.0,
+      '새친구': 0.0,
+      '임원': 0.0,
     };
 
     // 모든 사용자의 기도 시간을 가져옴
-    QuerySnapshot usersSnapshot = await _firestore.collection('users').get();
+    QuerySnapshot usersSnapshot = await _firestore.collection('teachers').get();
 
     for (var userDoc in usersSnapshot.docs) {
       String gradeClass = (userDoc.data() as Map<String, dynamic>)['gradeClass'] ?? '';
       String grade = '';
 
-      if (gradeClass.startsWith('1'))
+      if (gradeClass.startsWith('1')) {
         grade = '1학년';
-      else if (gradeClass.startsWith('2'))
+      } else if (gradeClass.startsWith('2')) {
         grade = '2학년';
-      else if (gradeClass.startsWith('3'))
+      } else if (gradeClass.startsWith('3')) {
         grade = '3학년';
-      else
+      } else if (gradeClass == '새친구') {
+        grade = '새친구';
+      } else if (gradeClass == '임원') {
+        grade = '임원';
+      } else {
         continue;
+      }
 
       // 각 사용자의 기도 시간을 가져옴
-      QuerySnapshot prayerTimesSnapshot = await _firestore.collection('users').doc(userDoc.id).collection('prayer_times').get();
+      QuerySnapshot prayerTimesSnapshot = await _firestore.collection('teachers').doc(userDoc.id).collection('prayer_times').where('date', isGreaterThanOrEqualTo: startDate.value).get();
 
       for (var prayerDoc in prayerTimesSnapshot.docs) {
         Map<String, dynamic> data = prayerDoc.data() as Map<String, dynamic>;
@@ -83,7 +142,7 @@ class PrayerTimeController extends GetxController {
     final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate.value);
 
     // 기존의 기도 시간을 불러와서 더하기
-    DocumentSnapshot doc = await _firestore.collection('users').doc(username).collection('prayer_times').doc(formattedDate).get();
+    DocumentSnapshot doc = await _firestore.collection('teachers').doc(username).collection('prayer_times').doc(formattedDate).get();
 
     int existingHour = 0;
     int existingMinute = 0;
@@ -104,7 +163,7 @@ class PrayerTimeController extends GetxController {
     }
 
     // Firestore에 새로운 합산된 시간 저장
-    await _firestore.collection('users').doc(username).collection('prayer_times').doc(formattedDate).set({
+    await _firestore.collection('teachers').doc(username).collection('prayer_times').doc(formattedDate).set({
       'date': selectedDate.value,
       'hour': totalHour,
       'minute': totalMinute,
@@ -115,7 +174,7 @@ class PrayerTimeController extends GetxController {
 
   // 누적 기도 시간과 오늘의 기도 시간을 계산하는 함수
   Future<void> calculateTotalPrayerTimes(String username) async {
-    QuerySnapshot querySnapshot = await _firestore.collection('users').doc(username).collection('prayer_times').get();
+    QuerySnapshot querySnapshot = await _firestore.collection('teachers').doc(username).collection('prayer_times').get();
 
     int totalHour = 0;
     int totalMinute = 0;
@@ -159,7 +218,7 @@ class PrayerTimeController extends GetxController {
   // 기도 시간을 가져오는 함수
   Stream<QuerySnapshot> getPrayerTimes(String username) {
     return _firestore
-        .collection('users')
+        .collection('teachers')
         .doc(username)
         .collection('prayer_times')
         .orderBy('date', descending: true) // 날짜별로 정렬
@@ -168,7 +227,7 @@ class PrayerTimeController extends GetxController {
 
   // Firestore에서 기도 시간 데이터를 삭제하는 함수 (선택한 날짜)
   Future<void> deletePrayerTime(String username, String docId) async {
-    await _firestore.collection('users').doc(username).collection('prayer_times').doc(docId).delete();
+    await _firestore.collection('teachers').doc(username).collection('prayer_times').doc(docId).delete();
 
     Get.snackbar('Success', "기도시간 삭제 완료!");
   }
@@ -177,7 +236,7 @@ class PrayerTimeController extends GetxController {
   Future<List<Map<String, dynamic>>> getStudentsByGrade(String grade) async {
     List<Map<String, dynamic>> students = [];
 
-    QuerySnapshot usersSnapshot = await _firestore.collection('users').get();
+    QuerySnapshot usersSnapshot = await _firestore.collection('teachers').get();
 
     for (var userDoc in usersSnapshot.docs) {
       Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
@@ -186,7 +245,7 @@ class PrayerTimeController extends GetxController {
       if (!gradeClass.startsWith(grade[0])) continue; // 해당 학년이 아니면 스킵
 
       // 학생의 기도 시간 합계 계산
-      QuerySnapshot prayerTimesSnapshot = await _firestore.collection('users').doc(userDoc.id).collection('prayer_times').get();
+      QuerySnapshot prayerTimesSnapshot = await _firestore.collection('teachers').doc(userDoc.id).collection('prayer_times').get();
 
       int totalMinutes = 0;
       for (var prayerDoc in prayerTimesSnapshot.docs) {
@@ -195,11 +254,11 @@ class PrayerTimeController extends GetxController {
       }
 
       // 목표 시간 대비 진행률 계산
-      double targetMinutes = calculateTargetMinutes(grade);
+      double targetMinutes = await calculateGradeTargetMinutes(grade);
       double progressPercentage = (totalMinutes / targetMinutes).clamp(0.0, 1.0);
 
       students.add({
-        'name': userData['username'] ?? '이름 없음',
+        'name': userData['name'] ?? '이름 없음',
         'hours': totalMinutes ~/ 60,
         'minutes': totalMinutes % 60,
         'progressPercentage': progressPercentage,
