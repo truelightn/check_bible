@@ -24,9 +24,30 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
   @override
   void initState() {
     super.initState();
-    // Firestore에서 누적 기도 시간을 계산하고 초기화
-    prayerTimeController.calculateTotalPrayerTimes(authController.username.value);
-    prayerTimeController.calculateGradeAccumulatedTimes(); // 학년별 누적시간 계산 추가
+    
+    // 로그인 상태 확인 및 데이터 초기화
+    if (authController.isLoggedIn.value) {
+      _initializeData();
+    } else {
+      // 자동 로그인 시도
+      authController.autoLogin();
+
+      // 자동 로그인 결과 확인
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (authController.isLoggedIn.value) {
+          _initializeData();
+        } else {
+          Get.offAllNamed('/');
+        }
+      });
+    }
+  }
+
+  void _initializeData() {
+    if (authController.username.value.isNotEmpty) {
+      prayerTimeController.calculateTotalPrayerTimes(authController.username.value);
+      prayerTimeController.calculateGradeAccumulatedTimes();
+    }
   }
 
   // 학년별 누적 기도시간을 계산하는 함수
@@ -243,27 +264,143 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
 
   Widget _buildTimeSelectButton(Duration duration) {
     bool isSelected = selectedDuration == duration;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          selectedDuration = duration;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.blue : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
+    
+    // 시간 형식 변환 (예: 1:30, 2:00)
+    String timeText = '${duration.inHours}:${(duration.inMinutes % 60).toString().padLeft(2, '0')}';
+
+    return Container(
+      margin: const EdgeInsets.only(right: 8, bottom: 8),
+      child: ElevatedButton(
+        onPressed: () {
+          setState(() {
+            selectedDuration = duration;
+          });
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isSelected ? Colors.blue : Colors.grey[200],
+          foregroundColor: isSelected ? Colors.white : Colors.black87,
+          elevation: isSelected ? 4 : 1,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(25),
+          ),
         ),
         child: Text(
-          duration.inMinutes == 0
-              ? '0분'
-              : '${duration.inHours > 0 ? '${duration.inHours}시간 ' : ''}'
-                  '${duration.inMinutes % 60 > 0 ? '${duration.inMinutes % 60}분' : ''}',
+          timeText,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 16,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrayerTimeInputCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  '기도시간 입력',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            InkWell(
+              onTap: () => _selectDate(context),
+              child: Row(
+                children: [
+                  Text(
+                    DateFormat('yyyy년 MM월 dd일 (E)', 'ko_KR').format(selectedDate),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.calendar_today,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '기도시간 선택',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                // 30분 단위 (30분 ~ 4시간)
+                for (int i = 1; i <= 8; i++) _buildTimeSelectButton(Duration(minutes: i * 30)),
+                // 4시간 30분 ~ 6시간
+                for (int i = 9; i <= 12; i++) _buildTimeSelectButton(Duration(minutes: i * 30)),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: selectedDuration.inMinutes > 0 ? _savePrayerTime : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.save),
+                    const SizedBox(width: 8),
+                    Text(
+                      selectedDuration.inMinutes > 0
+                          ? '기도시간 ${selectedDuration.inHours > 0 ? '${selectedDuration.inHours}시간 ' : ''}'
+                              '${selectedDuration.inMinutes % 60}분 저장'
+                          : '기도시간을 선택해주세요',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -520,176 +657,160 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('기도시간 입력'),
+        title: Obx(() {
+          final daysPassed = DateTime.now().difference(prayerTimeController.startDate.value).inDays + 1;
+          return Text('성락교회 고등부! 다니엘기도회 D+$daysPassed일차');
+        }),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: '로그아웃',
-            onPressed: () {
-              Get.dialog(
-                AlertDialog(
-                  title: const Text('로그아웃'),
-                  content: const Text('정말 로그아웃 하시겠습니까?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Get.back(),
-                      child: const Text('취소'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        authController.logout();
-                        Get.offAllNamed('/');
-                      },
-                      child: const Text('로그아웃'),
-                    ),
-                  ],
-                ),
-              );
-            },
+          Obx(() => authController.username.value.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.logout),
+                  tooltip: '로그아웃',
+                  onPressed: () {
+                    Get.dialog(
+                      AlertDialog(
+                        title: const Text('로그아웃'),
+                        content: const Text('정말 로그아웃 하시겠습니까?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Get.back(),
+                            child: const Text('취소'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              authController.logout();
+                              Get.offAllNamed('/');
+                            },
+                            child: const Text('로그아웃'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                )
+              : const SizedBox.shrink()
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+      body: Obx(() {
+        if (authController.username.value.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.lock_outline,
+                  size: 64,
+                  color: Colors.grey,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 4,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: Colors.blue,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                '학년별 누적 기도시간',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          TextButton.icon(
-                            onPressed: () {
-                              Get.to(() => GradePrayerDetailScreen());
-                            },
-                            icon: const Icon(Icons.arrow_forward),
-                            label: const Text('자세히 보기'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.blue,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _buildGradeChart(),
-                    ],
+                const SizedBox(height: 16),
+                const Text(
+                  '기도시간을 기록하려면\n로그인이 필요합니다',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.grey,
+                    height: 1.5,
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              _buildMyPrayerTimeCard(),
-              const SizedBox(height: 20),
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => Get.offAllNamed('/'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                  child: const Text(
+                    '로그인 하러가기',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '기도 날짜 및 시간 입력',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+              ],
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 4,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '학년별 누적 기도시간',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            TextButton.icon(
+                              onPressed: () {
+                                Get.to(() => GradePrayerDetailScreen());
+                              },
+                              icon: const Icon(Icons.arrow_forward),
+                              label: const Text('자세히 보기'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.blue,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () => _selectDate(context),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.calendar_today, color: Colors.blue),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      DateFormat('yyyy년 MM월 dd일 (E)', 'ko_KR').format(selectedDate),
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          ElevatedButton.icon(
-                            onPressed: _savePrayerTime,
-                            icon: const Icon(Icons.save),
-                            label: const Text('저장'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // 30분 단위 시간 선택 버튼들
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (int i = 0; i <= 8; i++) _buildTimeSelectButton(Duration(minutes: i * 30)),
-                        ],
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        _buildGradeChart(),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                height: 300,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 20),
+                _buildMyPrayerTimeCard(),
+                const SizedBox(height: 20),
+                _buildPrayerTimeInputCard(),
+                const SizedBox(height: 20),
+                Container(
+                  height: 300,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const PrayerTimeListWidget(),
                 ),
-                child: const PrayerTimeListWidget(),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 }

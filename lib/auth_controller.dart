@@ -31,6 +31,11 @@ class AuthController extends GetxController {
       userGradeClass.value = gradeClass;
       isLoggedIn.value = true;
 
+      // 로그인 정보를 로컬 스토리지에 저장
+      await storage.write('username', name);
+      await storage.write('gradeClass', gradeClass);
+      await storage.write('isLoggedIn', true);
+
       return true;
     } catch (e) {
       print('Login error: $e');
@@ -63,20 +68,34 @@ Future<void> _createNewAccount(String inputUsername, String inputPassword, Strin
     });
 }
 
+  void autoLogin() {
+    try {
+      String? storedUsername = storage.read('username');
+      String? storedGradeClass = storage.read('gradeClass');
+      bool? isStoredLoggedIn = storage.read('isLoggedIn');
 
-
-void autoLogin() {
-    String? storedUsername = storage.read('username');
-    String? storedPassword = storage.read('password');
-    String? storedGradeClass = storage.read('gradeClass'); // 저장된 학년+반 정보 불러오기
-
-    if (storedUsername != null && storedPassword != null && storedGradeClass != null) {
-      login(storedUsername, storedGradeClass);
+      if (storedUsername != null && storedGradeClass != null && isStoredLoggedIn == true) {
+        username.value = storedUsername;
+        userGradeClass.value = storedGradeClass;
+        isLoggedIn.value = true;
+        print('Auto login successful: ${username.value}'); // 디버깅용 로그
+      } else {
+        print('No stored login data found'); // 디버깅용 로그
+        isLoggedIn.value = false;
+      }
+    } catch (e) {
+      print('Auto login error: $e'); // 디버깅용 로그
+      isLoggedIn.value = false;
     }
   }
 
   // 로그아웃
   void logout() {
+    // 로그아웃 시 로컬 스토리지의 데이터도 삭제
+    storage.remove('username');
+    storage.remove('gradeClass');
+    storage.remove('isLoggedIn');
+    
     username.value = '';
     userGradeClass.value = '';
     isLoggedIn.value = false;

@@ -23,10 +23,15 @@ void main() async {
 class MyApp extends StatelessWidget {
   final AuthController authController = Get.put(AuthController());
 
+  MyApp() {
+    // 앱 시작 시 자동 로그인 시도
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      authController.autoLogin();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 앱 시작 시 자동 로그인 시도
-    authController.autoLogin();
 
     return GetMaterialApp(
       title: '기도시간 체크',
