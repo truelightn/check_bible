@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'auth_controller.dart'; // AuthController를 불러옵니다.
+import '../auth_controller.dart'; // AuthController를 불러옵니다.
 
 class BibleController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -31,9 +31,7 @@ class BibleController extends GetxController {
         if (data.containsKey('bibleProgress')) {
           var progressData = Map<String, dynamic>.from(data['bibleProgress']);
           progressData.forEach((book, chapters) {
-            bibleProgress[book] = Map<int, bool>.from(
-              (chapters as Map).map((key, value) => MapEntry(int.parse(key), value))
-            );
+            bibleProgress[book] = Map<int, bool>.from((chapters as Map).map((key, value) => MapEntry(int.parse(key), value)));
           });
 
           // 상태를 강제 리프레시하여 UI에 반영

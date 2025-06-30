@@ -7,13 +7,19 @@ class LoginScreen extends StatelessWidget {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
+  final RxString selectedGradeClass = '1학년'.obs; // 학년 + 반 선택 변수
+
+  // 학년과 반 옵션 생성
+  final List<String> gradeClassOptions = ['1학년', '2학년', '3학년', '새친구', '임원'];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('성락교회 고등부 찬양팀')),
+      appBar: AppBar(title: const Text('25년 고등부 여름 수련회 다니엘 기도회!')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
               controller: usernameController,
@@ -25,18 +31,43 @@ class LoginScreen extends StatelessWidget {
               obscureText: true,
             ),
             const SizedBox(height: 16),
+            Obx(() => DropdownButton<String>(
+                  value: selectedGradeClass.value,
+                  onChanged: (newValue) {
+                    selectedGradeClass.value = newValue!;
+                  },
+                  items: gradeClassOptions.map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                )),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
                 authController.login(
                   usernameController.text,
                   passwordController.text,
+                  selectedGradeClass.value, // 학년+반 정보 전달
                 );
               },
-              child: const Text('들어가기'),
+              child: const Text('등록하기'),
             ),
-            const Text('본인 이름과 비밀번호(간단한 비밀번호)를 입력해주세요'),
-            const Text('비밀 번호는 암화 되지 않고 저장이 됩니다. 평소 사용하지 않는 비밀번호를 입력해주세요'),
-            const Text('카카오톡에서 바로 열지말고 다른 브라우저로 열기해서 사용해주세요')
+            const SizedBox(
+              height: 20,
+            ),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('• 본인 이름과 비밀번호(간단한 비밀번호)를 입력해주세요'),
+                Text('• 확인되지 않는 이름은 삭제 됩니다!!'),
+                Text('• 비밀 번호는 암화 되지 않고 저장이 됩니다. 평소 사용하지 않는 비밀번호를 입력해주세요'),
+                Text('• 카카오톡에서 바로 열지말고 다른 브라우저로 열기해서 사용해주세요'),
+                Text('• 성공적인 수련회를 위해 열심히 기도합시다!'),
+              ],
+            ),
+
           ],
         ),
       ),

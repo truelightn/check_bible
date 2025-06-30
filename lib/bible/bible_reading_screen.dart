@@ -1,9 +1,11 @@
+import 'package:check_bible/auth_controller.dart';
+import 'package:check_bible/pray/prayer_time_input_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart'; // GetStorage 가져오기
 import 'bible_controller.dart';
-import 'login_screen.dart'; // 로그아웃 후 로그인 화면으로 이동하기 위한 스크린
-import 'compare_progress_screen.dart'; // CompareProgressScreen import
+import '../login_screen.dart'; // 로그아웃 후 로그인 화면으로 이동하기 위한 스크린
+import '../compare/compare_progress_screen.dart'; // CompareProgressScreen import
 
 class BibleReadingScreen extends StatefulWidget {
   @override
@@ -16,25 +18,76 @@ class _BibleReadingScreenState extends State<BibleReadingScreen> {
 
   // 구약 성경 책 목록과 각 책의 장 수
   final Map<String, int> oldTestamentChapters = {
-    '창세기': 50, '출애굽기': 40, '레위기': 27, '민수기': 36, '신명기': 34,
-    '여호수아': 24, '사사기': 21, '룻기': 4, '사무엘상': 31, '사무엘하': 24,
-    '열왕기상': 22, '열왕기하': 25, '역대상': 29, '역대하': 36, '에스라': 10,
-    '느헤미야': 13, '에스더': 10, '욥기': 42, '시편': 150, '잠언': 31,
-    '전도서': 12, '아가': 8, '이사야': 66, '예레미야': 52, '예레미야애가': 5,
-    '에스겔': 48, '다니엘': 12, '호세아': 14, '요엘': 3, '아모스': 9,
-    '오바댜': 1, '요나': 4, '미가': 7, '나훔': 3, '하박국': 3,
-    '스바냐': 3, '학개': 2, '스가랴': 14, '말라기': 4,
+    '창세기': 50,
+    '출애굽기': 40,
+    '레위기': 27,
+    '민수기': 36,
+    '신명기': 34,
+    '여호수아': 24,
+    '사사기': 21,
+    '룻기': 4,
+    '사무엘상': 31,
+    '사무엘하': 24,
+    '열왕기상': 22,
+    '열왕기하': 25,
+    '역대상': 29,
+    '역대하': 36,
+    '에스라': 10,
+    '느헤미야': 13,
+    '에스더': 10,
+    '욥기': 42,
+    '시편': 150,
+    '잠언': 31,
+    '전도서': 12,
+    '아가': 8,
+    '이사야': 66,
+    '예레미야': 52,
+    '예레미야애가': 5,
+    '에스겔': 48,
+    '다니엘': 12,
+    '호세아': 14,
+    '요엘': 3,
+    '아모스': 9,
+    '오바댜': 1,
+    '요나': 4,
+    '미가': 7,
+    '나훔': 3,
+    '하박국': 3,
+    '스바냐': 3,
+    '학개': 2,
+    '스가랴': 14,
+    '말라기': 4,
   };
 
   // 신약 성경 책 목록과 각 책의 장 수
   final Map<String, int> newTestamentChapters = {
-    '마태복음': 28, '마가복음': 16, '누가복음': 24, '요한복음': 21,
-    '사도행전': 28, '로마서': 16, '고린도전서': 16, '고린도후서': 13,
-    '갈라디아서': 6, '에베소서': 6, '빌립보서': 4, '골로새서': 4,
-    '데살로니가전서': 5, '데살로니가후서': 3, '디모데전서': 6, '디모데후서': 4,
-    '디도서': 3, '빌레몬서': 1, '히브리서': 13, '야고보서': 5,
-    '베드로전서': 5, '베드로후서': 3, '요한1서': 5, '요한2서': 1,
-    '요한3서': 1, '유다서': 1, '요한계시록': 22
+    '마태복음': 28,
+    '마가복음': 16,
+    '누가복음': 24,
+    '요한복음': 21,
+    '사도행전': 28,
+    '로마서': 16,
+    '고린도전서': 16,
+    '고린도후서': 13,
+    '갈라디아서': 6,
+    '에베소서': 6,
+    '빌립보서': 4,
+    '골로새서': 4,
+    '데살로니가전서': 5,
+    '데살로니가후서': 3,
+    '디모데전서': 6,
+    '디모데후서': 4,
+    '디도서': 3,
+    '빌레몬서': 1,
+    '히브리서': 13,
+    '야고보서': 5,
+    '베드로전서': 5,
+    '베드로후서': 3,
+    '요한1서': 5,
+    '요한2서': 1,
+    '요한3서': 1,
+    '유다서': 1,
+    '요한계시록': 22
   };
 
   // 신약만 보기 토글 상태를 관리하는 변수 (기본값: true)
@@ -101,12 +154,13 @@ class _BibleReadingScreenState extends State<BibleReadingScreen> {
                                   bibleController.updateChapterProgress(bookName, chapterIndex + 1, !isRead);
                                 },
                                 child: Container(
-                                  width: 30,  // 동그라미 크기
+                                  width: 30, // 동그라미 크기
                                   height: 30, // 동그라미 크기
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: isRead ? Colors.green : Colors.transparent, // 체크된 상태는 초록색, 체크 안된 상태는 투명
-                                    border: Border.all( // 체크 안된 상태에서 회색 테두리
+                                    border: Border.all(
+                                      // 체크 안된 상태에서 회색 테두리
                                       color: isRead ? Colors.green : Colors.grey, // 체크 안된 상태는 회색 테두리
                                       width: 1.0,
                                     ),
@@ -127,7 +181,8 @@ class _BibleReadingScreenState extends State<BibleReadingScreen> {
                     ],
                   ),
                 ),
-                const Divider( // 성경마다 구분선 추가
+                const Divider(
+                  // 성경마다 구분선 추가
                   thickness: 1.0, // 선 두께
                   color: Colors.black12, // 선 색상
                   height: 20.0, // 선과의 간격
@@ -144,16 +199,30 @@ class _BibleReadingScreenState extends State<BibleReadingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false, // 뒤로 가기 버튼 없앰
         title: Row(
+          crossAxisAlignment: CrossAxisAlignment.center, // 세로 가운데 정렬
           children: [
-            const Text('성락교회 고등부'),
-            IconButton(
-            icon: const Icon(Icons.bookmark_border_rounded), // 비교 아이콘 (아이콘은 원하는대로 변경 가능)
-            onPressed: () {
-              Get.to(() => CompareProgressScreen()); // CompareProgressScreen으로 이동
-            },
-          ),
-          ]
+            Text(AuthController.to.username.value),
+            const SizedBox(
+              width: 10,
+            ),
+            const SizedBox(
+              height: 24, // Divider의 높이를 명시적으로 설정
+              child: VerticalDivider(
+                thickness: 1, // 선의 두께
+                color: Colors.grey, // 선의 색상
+              ),
+            ),
+            const SizedBox(
+              width: 10,
+            ),
+            InkWell(
+                onTap: () {
+                  Get.to(() => CompareProgressScreen());
+                },
+                child: const Text('전체 현황 확인하기')),
+          ],
         ),
         actions: [
           IconButton(
@@ -169,8 +238,14 @@ class _BibleReadingScreenState extends State<BibleReadingScreen> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      Get.to(() => PrayerTimeInputScreen());
+                    },
+                    child: const Text('기도시간 입력'),
+                  ),
+                  const Spacer(),
                   const Text(
                     '신약만 보기',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
