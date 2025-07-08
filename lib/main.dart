@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
 
     return GetMaterialApp(
-      title: '기도시간 체크',
+      title: '성락교회 고등부',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         fontFamily: 'NotoSansKR',
@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       getPages: [
         GetPage(name: '/', page: () => LoginScreen()),
-        GetPage(name: '/prayer_time_input', page: () => PrayerTimeInputScreen()),
+        GetPage(name: '/prayer_time_input', page: () => const PrayerTimeInputScreen()),
       ],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
