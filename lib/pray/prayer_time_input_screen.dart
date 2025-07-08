@@ -403,16 +403,25 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                // 30분 단위 (30분 ~ 4시간)
-                for (int i = 1; i <= 8; i++) _buildTimeSelectButton(Duration(minutes: i * 30)),
-                // 4시간 30분 ~ 6시간
-                for (int i = 9; i <= 12; i++) _buildTimeSelectButton(Duration(minutes: i * 30)),
-              ],
-            ),
+            Obx(() {
+              bool isStudent = authController.userType.value == '학생';
+
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: isStudent
+                    ? [
+                        // 학생: 15분 단위 (15분 ~ 3시간)
+                        for (int i = 1; i <= 12; i++) _buildTimeSelectButton(Duration(minutes: i * 15)),
+                      ]
+                    : [
+                        // 교사: 30분 단위 (30분 ~ 4시간)
+                        for (int i = 1; i <= 8; i++) _buildTimeSelectButton(Duration(minutes: i * 30)),
+                        // 4시간 30분 ~ 6시간
+                        for (int i = 9; i <= 12; i++) _buildTimeSelectButton(Duration(minutes: i * 30)),
+                      ],
+              );
+            }),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -495,10 +504,10 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
             ),
             const SizedBox(height: 16),
             Obx(() {
-              final targetMinutes = prayerTimeController.calculateTargetMinutes();
+              final targetMinutes = prayerTimeController.calculateTargetMinutes(authController.userType.value);
               final targetHours = (targetMinutes / 60).floor();
               final targetMins = (targetMinutes % 60).round();
-              final progressPercentage = prayerTimeController.calculateProgressPercentage();
+              final progressPercentage = prayerTimeController.calculateProgressPercentage(authController.userType.value);
 
               return Column(
                 children: [
@@ -506,7 +515,7 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
                     children: [
                       Expanded(
                         child: _buildTimeInfoBox(
-                          '목표 기도시간',
+                          '목표 기도시간 (${authController.userType.value == '학생' ? '15분/일' : '30분/일'})',
                           '$targetHours시간 $targetMins분',
                           const Color(0xFFFF6B35),
                           Icons.flag,
@@ -576,7 +585,7 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
 
   void _showTargetSettingDialog() {
     final startDate = prayerTimeController.startDate.value;
-    final dailyTarget = prayerTimeController.dailyTargetMinutes.value;
+    final dailyTarget = prayerTimeController.getDailyTargetMinutes(authController.userType.value);
 
     Get.dialog(
       AlertDialog(
@@ -604,7 +613,7 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
             ),
             ListTile(
               title: const Text('하루 목표'),
-              subtitle: Text('$dailyTarget분'),
+              subtitle: Text('$dailyTarget분 (${authController.userType.value})'),
               trailing: const Icon(Icons.timer),
               onTap: () {
                 Get.back();
@@ -625,19 +634,33 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
 
   void _showDailyTargetDialog() {
     final controller = TextEditingController(
-      text: prayerTimeController.dailyTargetMinutes.value.toString(),
+      text: prayerTimeController.getDailyTargetMinutes(authController.userType.value).toString(),
     );
 
     Get.dialog(
       AlertDialog(
         title: const Text('하루 목표 시간 설정'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: '분 단위로 입력',
-            hintText: '예: 30',
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '현재 ${authController.userType.value} 기본 목표: ${prayerTimeController.getDailyTargetMinutes(authController.userType.value)}분',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '분 단위로 입력',
+                hintText: '예: 30',
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(

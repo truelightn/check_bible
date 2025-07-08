@@ -43,21 +43,6 @@ class LoginScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.person, color: Color(0xFF8B3DFF), size: 24), // 보라색
-                        SizedBox(width: 8),
-                        Text(
-                          '기본 정보',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
                     TextField(
                       controller: usernameController,
                       decoration: InputDecoration(

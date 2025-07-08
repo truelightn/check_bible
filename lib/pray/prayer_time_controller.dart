@@ -38,18 +38,37 @@ class PrayerTimeController extends GetxController {
       return DateTime(2025, 7, 6);
     }
   }
-  final RxInt dailyTargetMinutes = 30.obs; // 하루 목표 기도시간 (분)
+  final RxInt dailyTargetMinutes = 30.obs; // 하루 목표 기도시간 (분) - 교사 기본값
 
-  // 목표 기도시간 계산
-  double calculateTargetMinutes() {
+  // 사용자 타입별 하루 목표시간 반환
+  int getDailyTargetMinutes(String userType) {
+    return userType == '학생' ? 15 : 30; // 학생 15분, 교사 30분
+  }
+
+  // 목표 기도시간 계산 (사용자 타입별)
+  double calculateTargetMinutes(String userType) {
+    final now = DateTime.now();
+    final difference = now.difference(startDate.value).inDays;
+    return difference * getDailyTargetMinutes(userType).toDouble();
+  }
+
+  // 목표 기도시간 계산 (기존 호환성 유지)
+  double calculateTargetMinutesLegacy() {
     final now = DateTime.now();
     final difference = now.difference(startDate.value).inDays;
     return difference * dailyTargetMinutes.value.toDouble();
   }
 
-  // 목표 달성률 계산
-  double calculateProgressPercentage() {
-    final targetMinutes = calculateTargetMinutes();
+  // 목표 달성률 계산 (사용자 타입별)
+  double calculateProgressPercentage(String userType) {
+    final targetMinutes = calculateTargetMinutes(userType);
+    if (targetMinutes <= 0) return 0;
+    return ((totalPrayerHour.value * 60 + totalPrayerMinute.value) / targetMinutes * 100).clamp(0, 100);
+  }
+
+  // 목표 달성률 계산 (기존 호환성 유지)
+  double calculateProgressPercentageLegacy() {
+    final targetMinutes = calculateTargetMinutesLegacy();
     if (targetMinutes <= 0) return 0;
     return ((totalPrayerHour.value * 60 + totalPrayerMinute.value) / targetMinutes * 100).clamp(0, 100);
   }
@@ -69,7 +88,7 @@ class PrayerTimeController extends GetxController {
     final int daysPassed = DateTime.now().difference(startDate.value).inDays;
 
     // 해당 학년의 학생 수 계산 (사용자 타입에 따라 필터링)
-    int studentCount = 0;
+    double totalTargetMinutes = 0.0;
 
     List<String> collectionsToCheck = currentUserType == '학생' ? ['students'] : ['students', 'teachers'];
 
@@ -78,22 +97,30 @@ class PrayerTimeController extends GetxController {
 
       for (var userDoc in usersSnapshot.docs) {
         String gradeClass = (userDoc.data() as Map<String, dynamic>)['gradeClass'] ?? '';
+        bool isGradeMatch = false;
 
         if (grade == '1학년' && gradeClass.startsWith('1')) {
-          studentCount++;
+          isGradeMatch = true;
         } else if (grade == '2학년' && gradeClass.startsWith('2')) {
-          studentCount++;
+          isGradeMatch = true;
         } else if (grade == '3학년' && gradeClass.startsWith('3')) {
-          studentCount++;
+          isGradeMatch = true;
         } else if (grade == '새친구' && gradeClass == '새친구') {
-          studentCount++;
+          isGradeMatch = true;
         } else if (grade == '임원' && gradeClass == '임원') {
-          studentCount++;
+          isGradeMatch = true;
+        }
+
+        if (isGradeMatch) {
+          // 해당 사용자의 타입에 따라 다른 일일 목표시간 적용
+          String userType = collection == 'students' ? '학생' : '교사';
+          int dailyTarget = getDailyTargetMinutes(userType);
+          totalTargetMinutes += dailyTarget * (daysPassed + 1);
         }
       }
     }
 
-    return studentCount * 30.0 * (daysPassed + 1); // 하루 30분 * 실제 인원수 * 경과일수
+    return totalTargetMinutes;
   }
 
   // 학년별 누적 시간 계산 - 사용자 타입 필터링
@@ -144,34 +171,42 @@ class PrayerTimeController extends GetxController {
     return accumulatedMinutes;
   }
 
-  // 학년별 목표시간 계산 (분 단위)
+  // 학년별 목표시간 계산 (분 단위) - 학생과 교사 혼합
   Future<double> calculateGradeTargetMinutes(String grade) async {
     final int daysPassed = DateTime.now().difference(startDate.value).inDays;
 
-    // 해당 학년의 학생 수 계산 (학생과 교사 컬렉션 모두 확인)
-    int studentCount = 0;
+    // 해당 학년의 총 목표시간 계산 (학생과 교사 컬렉션 모두 확인)
+    double totalTargetMinutes = 0.0;
     
     for (String collection in ['students', 'teachers']) {
       QuerySnapshot usersSnapshot = await _firestore.collection(collection).get();
 
       for (var userDoc in usersSnapshot.docs) {
         String gradeClass = (userDoc.data() as Map<String, dynamic>)['gradeClass'] ?? '';
+        bool isGradeMatch = false;
 
         if (grade == '1학년' && gradeClass.startsWith('1')) {
-          studentCount++;
+          isGradeMatch = true;
         } else if (grade == '2학년' && gradeClass.startsWith('2')) {
-          studentCount++;
+          isGradeMatch = true;
         } else if (grade == '3학년' && gradeClass.startsWith('3')) {
-          studentCount++;
+          isGradeMatch = true;
         } else if (grade == '새친구' && gradeClass == '새친구') {
-          studentCount++;
+          isGradeMatch = true;
         } else if (grade == '임원' && gradeClass == '임원') {
-          studentCount++;
+          isGradeMatch = true;
+        }
+
+        if (isGradeMatch) {
+          // 해당 사용자의 타입에 따라 다른 일일 목표시간 적용
+          String userType = collection == 'students' ? '학생' : '교사';
+          int dailyTarget = getDailyTargetMinutes(userType);
+          totalTargetMinutes += dailyTarget * (daysPassed + 1);
         }
       }
     }
 
-    return studentCount * 30.0 * (daysPassed + 1); // 하루 30분 * 실제 인원수 * 경과일수
+    return totalTargetMinutes;
   }
 
   // 학년별 누적 시간 계산
