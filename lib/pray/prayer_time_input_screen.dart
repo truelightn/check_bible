@@ -31,16 +31,9 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
     if (authController.isLoggedIn.value) {
       _initializeData();
     } else {
-      // 자동 로그인 시도
-      authController.autoLogin();
-
-      // 자동 로그인 결과 확인
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (authController.isLoggedIn.value) {
-          _initializeData();
-        } else {
-          Get.offAllNamed('/');
-        }
+      // 로그인되지 않았으면 로그인 화면으로 리디렉션
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.offAllNamed('/');
       });
     }
   }

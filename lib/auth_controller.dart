@@ -82,19 +82,39 @@ Future<void> _createNewAccount(String inputUsername, String inputPassword, Strin
       String? storedUserType = storage.read('userType');
       bool? isStoredLoggedIn = storage.read('isLoggedIn');
 
-      if (storedUsername != null && storedGradeClass != null && storedUserType != null && isStoredLoggedIn == true) {
+      print('Auto login data check:');
+      print('  - storedUsername: $storedUsername');
+      print('  - storedGradeClass: $storedGradeClass');
+      print('  - storedUserType: $storedUserType');
+      print('  - isStoredLoggedIn: $isStoredLoggedIn');
+
+      if (storedUsername != null &&
+          storedUsername.isNotEmpty &&
+          storedGradeClass != null &&
+          storedGradeClass.isNotEmpty &&
+          storedUserType != null &&
+          storedUserType.isNotEmpty &&
+          isStoredLoggedIn == true) {
+        
         username.value = storedUsername;
         userGradeClass.value = storedGradeClass;
         userType.value = storedUserType;
         isLoggedIn.value = true;
-        print('Auto login successful: ${username.value} (${userType.value})'); // 디버깅용 로그
+        
+        print('Auto login successful: ${username.value} (${userType.value})');
       } else {
-        print('No stored login data found'); // 디버깅용 로그
+        print('Auto login failed: incomplete data');
         isLoggedIn.value = false;
+        username.value = '';
+        userGradeClass.value = '';
+        userType.value = '';
       }
     } catch (e) {
-      print('Auto login error: $e'); // 디버깅용 로그
+      print('Auto login error: $e');
       isLoggedIn.value = false;
+      username.value = '';
+      userGradeClass.value = '';
+      userType.value = '';
     }
   }
 

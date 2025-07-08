@@ -20,26 +20,56 @@ void main() async {
   runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  final AuthController authController = Get.put(AuthController());
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
 
-  MyApp() {
-    // 앱 시작 시 자동 로그인 시도
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      authController.autoLogin();
+class _MyAppState extends State<MyApp> {
+  final AuthController authController = Get.put(AuthController());
+  bool isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // 자동 로그인 시도
+    await Future.delayed(const Duration(milliseconds: 100)); // 약간의 딜레이
+    authController.autoLogin();
+    
+    // 초기화 완료
+    setState(() {
+      isInitialized = true;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-
     return GetMaterialApp(
       title: '성락교회 고등부',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         fontFamily: 'NotoSansKR',
       ),
-      initialRoute: '/',
+      home: !isInitialized
+          ? const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B3DFF)),
+                ),
+              ),
+            )
+          : Obx(() {
+              // 자동 로그인 상태에 따라 다른 화면으로 이동
+              if (authController.isLoggedIn.value && authController.username.value.isNotEmpty) {
+                return const PrayerTimeInputScreen();
+              } else {
+                return LoginScreen();
+              }
+            }),
       getPages: [
         GetPage(name: '/', page: () => LoginScreen()),
         GetPage(name: '/prayer_time_input', page: () => const PrayerTimeInputScreen()),
