@@ -22,17 +22,22 @@ class PrayerTimeController extends GetxController {
     '임원': 0.0,
   }.obs;
 
-  // 학년별 학생 수 (임시 데이터)
-  final Map<String, int> gradeStudentCount = {
-    '1학년': 10,
-    '2학년': 10,
-    '3학년': 10,
-    '새친구': 5,
-    '임원': 5,
-  };
 
   // 목표 기도시간 설정
-  final Rx<DateTime> startDate = DateTime(2025, 6, 28).obs;
+  final Rx<DateTime> startDate = _getStartDate().obs;
+
+  // 시작 날짜 결정 함수
+  static DateTime _getStartDate() {
+    final now = DateTime.now();
+    final july13 = DateTime(2025, 7, 13);
+
+    // 현재 시간이 7월 13일 이후면 7월 13일로, 그전에는 7월 6일로 설정
+    if (now.isAfter(july13) || now.isAtSameMomentAs(july13)) {
+      return july13;
+    } else {
+      return DateTime(2025, 7, 6);
+    }
+  }
   final RxInt dailyTargetMinutes = 30.obs; // 하루 목표 기도시간 (분)
 
   // 목표 기도시간 계산

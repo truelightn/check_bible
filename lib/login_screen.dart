@@ -192,7 +192,7 @@ class LoginScreen extends StatelessWidget {
                               Icon(Icons.school, color: Color(0xFFFF6B35), size: 20), // 주황색 아이콘
                               SizedBox(width: 8),
                               Text(
-                                '학년/반',
+                                '학년',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -321,7 +321,6 @@ class LoginScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _InfoText(text: '본인 이름과 비밀번호(간단한 비밀번호)를 입력해주세요'),
-                        _InfoText(text: '확인되지 않는 이름은 삭제 됩니다!!'),
                         _InfoText(text: '비밀 번호는 암화 되지 않고 저장이 됩니다. 평소 사용하지 않는 비밀번호를 입력해주세요'),
                         _InfoText(text: '카카오톡에서 바로 열지말고 다른 브라우저로 열기해서 사용해주세요'),
                         _InfoText(text: '성공적인 수련회를 위해 열심히 기도합시다!'),
