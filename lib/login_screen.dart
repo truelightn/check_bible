@@ -264,7 +264,7 @@ class LoginScreen extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  '등록하기',
+                  '기도하러가기',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
