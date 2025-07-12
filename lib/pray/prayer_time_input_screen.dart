@@ -101,6 +101,10 @@ class _PrayerTimeInputScreenState extends State<PrayerTimeInputScreen> {
             if (interval % 60 != 0) {
               interval = ((interval / 60).ceil() * 60).toDouble();
             }
+            // interval이 0이 되는 것을 방지 (최소 60분)
+            if (interval <= 0) {
+              interval = 60.0;
+            }
             chartMaxY = interval * 10; // maxY를 간격의 10배로 조정
 
             return Column(
