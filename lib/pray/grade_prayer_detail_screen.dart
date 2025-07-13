@@ -45,21 +45,24 @@ class GradePrayerDetailScreen extends StatelessWidget {
 
     if (currentUserType == '학생') {
       // 학생 로그인시: 학생만 표시
-      return _buildSingleUserTypeTab(grade, '학생');
+      return SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: _buildSingleUserTypeTab(grade, '학생'),
+        ),
+      );
     } else {
       // 교사 로그인시: 학생과 교사 분리해서 표시
-      return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Expanded(
-              child: _buildSingleUserTypeTab(grade, '학생'),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _buildSingleUserTypeTab(grade, '교사'),
-            ),
-          ],
+      return SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              _buildSingleUserTypeTab(grade, '학생'),
+              const SizedBox(height: 16),
+              _buildSingleUserTypeTab(grade, '교사'),
+            ],
+          ),
         ),
       );
     }
@@ -184,108 +187,107 @@ class GradePrayerDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Expanded(
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                '개별 기도시간',
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              '개별 기도시간',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: themeColor,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: themeColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                targetUserType,
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
                                   color: themeColor,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: themeColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  targetUserType,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: themeColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Expanded(
-                            child: FutureBuilder<List<Map<String, dynamic>>>(
-                              future: prayerTimeController.getStudentsByGradeAndSpecificType(grade, targetUserType),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState == ConnectionState.waiting) {
-                                  return const Center(child: CircularProgressIndicator());
-                                }
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          height: 300, // 약 6명 정도가 보이도록 높이 제한
+                          child: FutureBuilder<List<Map<String, dynamic>>>(
+                            future: prayerTimeController.getStudentsByGradeAndSpecificType(grade, targetUserType),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
 
-                                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                                  return Center(
-                                    child: Text(
-                                      '${targetUserType} 데이터가 없습니다.',
-                                      style: TextStyle(color: Colors.grey[600]),
+                              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                return Center(
+                                  child: Text(
+                                    '${targetUserType} 데이터가 없습니다.',
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                );
+                              }
+
+                              var students = snapshot.data!;
+                              return ListView.separated(
+                                itemCount: students.length,
+                                separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey[300]),
+                                itemBuilder: (context, index) {
+                                  var student = students[index];
+                                  
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                                    title: Text(
+                                      student['name'],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '${student['hours']}시간 ${student['minutes']}분',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                    trailing: Container(
+                                      width: 25,
+                                      height: 25,
+                                      child: CircularProgressIndicator(
+                                        value: student['progressPercentage'],
+                                        backgroundColor: Colors.grey[200],
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          student['progressPercentage'] >= 1.0
+                                              ? const Color(0xFF4CAF50)
+                                              : student['progressPercentage'] < 0.3
+                                                  ? const Color(0xFFF44336)
+                                                  : themeColor,
+                                        ),
+                                        strokeWidth: 2,
+                                      ),
                                     ),
                                   );
-                                }
-
-                                var students = snapshot.data!;
-                                return ListView.separated(
-                                  itemCount: students.length,
-                                  separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey[300]),
-                                  itemBuilder: (context, index) {
-                                    var student = students[index];
-                                    
-                                    return ListTile(
-                                      dense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      title: Text(
-                                        student['name'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        '${student['hours']}시간 ${student['minutes']}분',
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                      trailing: Container(
-                                        width: 30,
-                                        height: 30,
-                                        child: CircularProgressIndicator(
-                                          value: student['progressPercentage'],
-                                          backgroundColor: Colors.grey[200],
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            student['progressPercentage'] >= 1.0
-                                                ? const Color(0xFF4CAF50)
-                                                : student['progressPercentage'] < 0.3
-                                                    ? const Color(0xFFF44336)
-                                                    : themeColor,
-                                          ),
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            ),
+                                },
+                              );
+                            },
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
